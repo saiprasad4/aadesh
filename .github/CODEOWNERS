@@ -1,0 +1,6 @@
+# Every change requests review from the maintainer, who has final say on merges.
+* @saiprasad4
+
+# The error-code dataset is accuracy-critical... always maintainer-reviewed.
+/src/codes/ @saiprasad4
+/src/rails.ts @saiprasad4

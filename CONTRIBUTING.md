@@ -46,6 +46,31 @@ npm run check   # typecheck + lint (Biome) + test + build
 All four must pass. Add a test for any behaviour change... especially anything
 touching retry/terminal decisions.
 
+## Governance and how changes are merged
+
+Contributions are genuinely welcome... issues, dataset corrections, code, docs.
+The model is simple and open by default, with one deliberate exception.
+
+- **The maintainer has final say on every merge.** Because this library informs
+  money decisions, the originator and maintainer (Saiprasad Shankar,
+  [@saiprasad4](https://github.com/saiprasad4)) reviews and approves each change.
+  This is enforced by [CODEOWNERS](.github/CODEOWNERS) and branch protection, not
+  by convention... every pull request needs maintainer approval and a green CI run
+  before it can merge to `main`.
+- **All work lands through pull requests.** Fork, branch, open a PR. `main` is
+  protected; nothing is pushed to it directly.
+- **CI is the floor, not the ceiling.** `npm run check` (typecheck + Biome + tests
+  + build) must pass, and a behaviour change needs a test. Passing CI makes a PR
+  *reviewable*, not *merged*... dataset and rule changes still get read line by line.
+- **Dataset changes are held to the highest bar.** A code mapped to the wrong
+  category can cause a wrong money decision, so error-code and rail-rule changes
+  are reviewed against the cited primary source before merge. When a source is not
+  primary, the entry stays `verified: false` rather than being presented as fact.
+
+None of this is meant to gatekeep... it is the same conservatism the library
+itself applies to money. Open an issue first for anything non-trivial and we will
+sort out the approach together before you invest in a PR.
+
 ## Reporting inaccuracies
 
 Found a code mapped to the wrong category, or a rail rule that contradicts a
