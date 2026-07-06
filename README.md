@@ -1,11 +1,11 @@
 # aadesh
 
-[![npm version](https://img.shields.io/npm/v/aadesh.svg)](https://www.npmjs.com/package/aadesh)
+[![npm version](https://img.shields.io/npm/v/@saiprasad4/aadesh.svg)](https://www.npmjs.com/package/@saiprasad4/aadesh)
 [![CI](https://github.com/saiprasad4/aadesh/actions/workflows/ci.yml/badge.svg)](https://github.com/saiprasad4/aadesh/actions/workflows/ci.yml)
-[![types included](https://img.shields.io/npm/types/aadesh.svg)](https://www.npmjs.com/package/aadesh)
-[![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](https://www.npmjs.com/package/aadesh?activeTab=dependencies)
-[![minzipped size](https://img.shields.io/bundlephobia/minzip/aadesh.svg)](https://bundlephobia.com/package/aadesh)
-[![license](https://img.shields.io/npm/l/aadesh.svg)](./LICENSE)
+[![types included](https://img.shields.io/npm/types/@saiprasad4/aadesh.svg)](https://www.npmjs.com/package/@saiprasad4/aadesh)
+[![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](https://www.npmjs.com/package/@saiprasad4/aadesh?activeTab=dependencies)
+[![minzipped size](https://img.shields.io/bundlephobia/minzip/@saiprasad4/aadesh.svg)](https://bundlephobia.com/package/@saiprasad4/aadesh)
+[![license](https://img.shields.io/npm/l/@saiprasad4/aadesh.svg)](./LICENSE)
 
 **Model the Indian recurring-payment mandate lifecycle... eNACH + UPI Autopay... in one typed, zero-dependency library.**
 
@@ -30,13 +30,13 @@ It is **deterministic and dependency-free**... it runs on your server or on-devi
 ## Install
 
 ```bash
-npm install aadesh
+npm install @saiprasad4/aadesh
 ```
 
 ## Quickstart
 
 ```ts
-import { getErrorCode, decideRetry, MandateMachine } from 'aadesh';
+import { getErrorCode, decideRetry, MandateMachine } from '@saiprasad4/aadesh';
 
 // 1. Understand a failure... normalized handling, not a raw code lookup.
 const err = getErrorCode('AP02', { rail: 'enach' }); // eNACH return code

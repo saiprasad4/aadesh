@@ -1,5 +1,5 @@
 {
-  "name": "aadesh",
+  "name": "@saiprasad4/aadesh",
   "version": "0.1.0",
   "description": "Model the Indian recurring-payment mandate lifecycle (eNACH + UPI Autopay): normalize bank/NPCI error codes, drive the mandate & debit state machines, and encode RBI/NPCI retry rules. Zero dependencies, typed, ESM+CJS.",
   "keywords": [
