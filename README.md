@@ -19,9 +19,9 @@ Normalize raw bank/NPCI/PSP error codes to consistent, **money-safe** handling, 
 
 Recurring payments in India fail *a lot*, and the failure is getting worse:
 
-- NACH e-mandate **rejection rates have climbed past 50%** (from ~28% a few years ago).[^1]
-- UPI Autopay runs **~1 billion recurring transactions a month**... with **~20 million mandates revoked monthly** for insufficient balance alone.[^2]
-- Every failed debit costs **₹200-2,000 + GST** in bounce charges, plus involuntary churn.[^3]
+- NACH e-mandate **rejection rates have climbed to ~55%** (from ~28% in 2017-18).[^1]
+- UPI Autopay sees **20 million+ mandates revoked monthly** for insufficient balance alone, against a base on the order of **~120 million recurring debits a month**.[^2]
+- Every failed debit carries a bank return charge, commonly **₹250-500 + 18% GST**, plus involuntary churn.[^3]
 
 Every fintech re-implements the same fragile logic against a **moving target** of NPCI circulars: hundreds of return/decline codes across five layers (app, PSP, sponsor bank, destination bank, NPCI), two structurally different rails, retry caps and windows that change by circular. `aadesh` is that logic, modelled once, conservatively, and kept in the open.
 
@@ -157,5 +157,5 @@ The dataset gets better with more eyes. Corrections backed by a source are the m
 MIT © Saiprasad Shankar
 
 [^1]: NACH e-mandate rejection rate ~55% (Nov 2025), up from ~28%... [FACTLY, citing NPCI](https://factly.in/nach-e-mandates-scale-up-but-rejections-rise/).
-[^2]: ~1 billion UPI Autopay executions/month; ~20 million mandates revoked monthly... [Business Standard](https://www.business-standard.com/finance/news/upi-autopay-revocations-hit-20-mn-monthly-over-low-customer-balances-125090700500_1.html).
-[^3]: Per-bounce charges ₹200-2,000 + 18% GST across major banks... bank NACH/ECS return-charge schedules.
+[^2]: 20 million+ UPI Autopay mandates revoked monthly over low balances... [Business Standard, Sep 2025](https://www.business-standard.com/finance/news/upi-autopay-revocations-hit-20-mn-monthly-over-low-customer-balances-125090700500_1.html). Recurring-execution base on the order of ~120 million/month per NPCI (early 2026).
+[^3]: Bank NACH/ECS return charges typically ₹250-500 + 18% GST, varying by bank (e.g. SBI ₹250 + GST = ₹295 all-in)... bank fee schedules.
