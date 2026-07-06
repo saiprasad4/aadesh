@@ -1,0 +1,70 @@
+{
+  "name": "aadesh",
+  "version": "0.1.0",
+  "description": "Model the Indian recurring-payment mandate lifecycle (eNACH + UPI Autopay): normalize bank/NPCI error codes, drive the mandate & debit state machines, and encode RBI/NPCI retry rules. Zero dependencies, typed, ESM+CJS.",
+  "keywords": [
+    "enach",
+    "nach",
+    "upi-autopay",
+    "emandate",
+    "e-mandate",
+    "mandate",
+    "recurring-payments",
+    "autopay",
+    "npci",
+    "rbi",
+    "fintech",
+    "india",
+    "razorpay",
+    "cashfree",
+    "subscription-billing",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Saiprasad Shankar",
+    "email": "saiprasad.shankar@gmail.com",
+    "url": "https://github.com/saiprasad4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saiprasad4/aadesh.git"
+  },
+  "homepage": "https://github.com/saiprasad4/aadesh#readme",
+  "bugs": {
+    "url": "https://github.com/saiprasad4/aadesh/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

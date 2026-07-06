@@ -1,0 +1,54 @@
+/**
+ * aadesh... model the Indian recurring-payment mandate lifecycle.
+ *
+ * eNACH / e-mandate + UPI Autopay, in one typed, zero-dependency vocabulary:
+ *  - normalize raw bank/NPCI/PSP error codes to consistent, conservative handling
+ *  - drive the mandate and single-debit state machines
+ *  - decide retries under the RBI/NPCI rules (attempt caps, spacing, safety)
+ *
+ * @packageDocumentation
+ */
+
+// ── Errors ───────────────────────────────────────────────────────────────────
+export { AadeshError, InvalidTransitionError, AmbiguousCodeError } from './errors';
+
+// ── Core types ───────────────────────────────────────────────────────────────
+export type {
+  Rail,
+  MandateLayer,
+  ErrorCategory,
+  CategoryHandling,
+  RawErrorCode,
+  MandateErrorCode,
+} from './types';
+
+// ── Rails ────────────────────────────────────────────────────────────────────
+export { getRailProfile, railProfiles } from './rails';
+export type { RailProfile } from './rails';
+
+// ── State machines ───────────────────────────────────────────────────────────
+export { StateMachine, MandateMachine, DebitMachine } from './state/machine';
+export {
+  MANDATE_TRANSITIONS,
+  DEBIT_TRANSITIONS,
+  TERMINAL_MANDATE_STATES,
+  TERMINAL_DEBIT_STATES,
+} from './state/states';
+export type { MandateState, DebitState } from './state/states';
+
+// ── Error-code dictionary ────────────────────────────────────────────────────
+export {
+  getErrorCode,
+  handlingFor,
+  isRetriable,
+  isTerminal,
+  allErrorCodes,
+  errorCodeCount,
+  CATEGORY_HANDLING,
+  DATASET_META,
+} from './codes';
+export type { LookupOptions } from './codes';
+
+// ── Retry policy ─────────────────────────────────────────────────────────────
+export { decideRetry } from './retry/policy';
+export type { RetryContext, RetryDecision } from './retry/policy';
