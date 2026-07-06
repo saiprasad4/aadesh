@@ -1,0 +1,35 @@
+name: Release
+
+# Publishes to npm with build provenance when a version tag is pushed.
+# Provenance requires `id-token: write` (OIDC) and a public repository, and is
+# what puts the "Built and signed on GitHub Actions" badge on the npm page.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # Full gate before anything leaves the building: typecheck, lint, test, build.
+      # (prepublishOnly re-runs this, so a red suite can never publish.)
+      - run: npm run check
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
