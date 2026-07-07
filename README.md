@@ -17,15 +17,15 @@ Normalize raw bank/NPCI/PSP error codes to consistent, **money-safe** handling, 
 
 ## Why
 
-Recurring payments in India fail *a lot*, and the failure is getting worse:
+Recurring payments in India fail often, and the failure rate keeps climbing:
 
 - NACH e-mandate **rejection rates have climbed to ~55%** (from ~28% in 2017-18).[^1]
 - UPI Autopay sees **20 million+ mandates revoked monthly** for insufficient balance alone, against a base on the order of **~120 million recurring debits a month**.[^2]
 - Every failed debit carries a bank return charge, commonly **₹250-500 + 18% GST**, plus involuntary churn.[^3]
 
-Every fintech re-implements the same fragile logic against a **moving target** of NPCI circulars: hundreds of return/decline codes across five layers (app, PSP, sponsor bank, destination bank, NPCI), two structurally different rails, retry caps and windows that change by circular. `aadesh` is that logic, modelled once, conservatively, and kept in the open.
+Every fintech re-implements the same fragile logic against a moving target of NPCI circulars: hundreds of return and decline codes across five layers (app, PSP, sponsor bank, destination bank, NPCI), two structurally different rails, retry caps and windows that change by circular. `aadesh` is that logic, modelled once, conservatively, and kept in the open.
 
-It is **deterministic and dependency-free**... it runs on your server or on-device, makes no network calls, and never touches payment data.
+It is deterministic and dependency-free. It runs on your server or on-device, makes no network calls, and never touches payment data.
 
 ## Install
 
@@ -77,7 +77,7 @@ getErrorCode('00')?.category; // 'success'
 
 Only categories where a retry is genuinely safe and likely to succeed... insufficient funds, transient bank/network faults, a single bad OTP... are auto-retriable. Everything ambiguous, permanent, fraud-flagged, or locked stops and hands the decision back to you.
 
-## What's in the box
+## What it does
 
 | Module | What it does |
 |---|---|
@@ -144,13 +144,6 @@ Fully unit-tested and deterministic given an injected clock.
 ## Contributing
 
 The dataset gets better with more eyes. Corrections backed by a source are the most valuable contribution... see [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-## Roadmap
-
-- [ ] PSP webhook adapters (Razorpay, Cashfree)... deferred to `0.2.0` until each webhook schema is verified against official docs
-- [ ] Model the Aug-2025 UPI Autopay non-peak execution windows in retry scheduling
-- [ ] Mandate-execution reconciliation helpers (expected vs. bank truth)
-- [ ] Lock the eNACH attempt cap and the ₹1L MCC list against primary NPCI PDFs
 
 ## License
 
