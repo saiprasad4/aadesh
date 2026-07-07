@@ -13,6 +13,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.1.1] - 2026-07-07
+
+### Changed
+- README only: removed the roadmap section and trimmed phrasing. No code or dataset changes.
+
 ## [0.1.0] - 2026-07-06
 
 Initial release. Models the Indian recurring-payment mandate lifecycle
