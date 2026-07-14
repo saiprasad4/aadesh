@@ -38,6 +38,16 @@ export interface RailProfile {
   readonly higherNoAdditionalFactorMccs: readonly string[];
   /** Minimum spacing between retry attempts the library will schedule. */
   readonly minRetryGapHours: number;
+  /**
+   * Window (hours) after a debit is presented within which its outcome is
+   * normally reported back. Past this, an attempt with no matching outcome is
+   * treated as `timed_out` by reconciliation and should be status-probed, not
+   * blindly retried (it may have actually settled). eNACH returns arrive
+   * T+1..T+n in batch files, so the window is days; UPI Autopay resolves in near
+   * real-time. Both values are conservative library defaults and are
+   * sponsor/PSP dependent... override per your own agreement.
+   */
+  readonly returnWindowHours: number;
   /** Whether editing amount/date typically forces a full re-registration. */
   readonly amendmentRequiresReRegistration: boolean;
   /** Human-readable pointer to the governing rule(s). */
@@ -73,6 +83,7 @@ const PROFILES: Record<Rail, RailProfile> = {
     higherNoAdditionalFactorLimitInr: 100000,
     higherNoAdditionalFactorMccs: HIGHER_NO_AFA_MCCS,
     minRetryGapHours: 1,
+    returnWindowHours: 24,
     amendmentRequiresReRegistration: false,
     reference:
       'UPI Autopay attempt cap (1+3) per the Aug-2025 UPI Autopay changes; RBI Digital Payments E-mandate Framework, 2026 (RBI/DPSS/2026-27/396) for 24h notice and no-AFA limits; NPCI/UPI/OC-151A for the ₹1L MCC list.',
@@ -88,6 +99,7 @@ const PROFILES: Record<Rail, RailProfile> = {
     higherNoAdditionalFactorLimitInr: 100000,
     higherNoAdditionalFactorMccs: HIGHER_NO_AFA_MCCS,
     minRetryGapHours: 24,
+    returnWindowHours: 96,
     amendmentRequiresReRegistration: true,
     reference:
       'RBI Digital Payments E-mandate Framework, 2026 (RBI/DPSS/2026-27/396). Attempt count is sponsor-bank dependent... no authoritative NPCI-wide cap exists (default 3, unverified).',

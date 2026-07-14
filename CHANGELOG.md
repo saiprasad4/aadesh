@@ -13,6 +13,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.2.0] - 2026-07-14
+
+### Added
+- `reconcile`: match reported outcomes back to the attempts you made, grouped into logical debits by an idempotency `debitKey`. Detects the async-return-vs-retry race (`double_debit_risk`), confirmed double debits (`double_debit_confirmed`, reversal required), amount mismatches, orphan outcomes, and pending vs timed-out debits, with conservative per-status handling.
+- `RECONCILIATION_HANDLING` / `reconciliationHandlingFor`, and the reconciliation types (`DebitAttempt`, `DebitOutcome`, `ReconciledDebit`, `ReconciliationReport`, `ReconciliationStatus`).
+- `RailProfile.returnWindowHours`: the per-rail window after which an unmatched attempt is treated as timed out (eNACH 96h, UPI Autopay 24h; conservative defaults).
+
 ## [0.1.1] - 2026-07-07
 
 ### Changed

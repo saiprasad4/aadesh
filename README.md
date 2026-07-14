@@ -85,6 +85,32 @@ Only categories where a retry is genuinely safe and likely to succeed... insuffi
 | **State machines** | `MandateMachine` (registration) and `DebitMachine` (single debit) with explicit, inspectable transition tables. Illegal transitions throw; the debit machine enforces the mandatory pre-debit notice. |
 | **Retry policy** | `decideRetry`... composes success/terminal/unknown handling, the rail's attempt cap (UPI Autopay 1+3), and retry spacing into one money-safe decision. |
 | **Rail profiles** | `getRailProfile`... the operational rules of each rail (settlement, attempt cap, pre-debit notice, AFA limits) as frozen, readable data. |
+| **Reconciliation** | `reconcile`... match the outcomes a bank/PSP reported back to the attempts you made, catch the async-return-vs-retry race before it becomes a double debit, and flag reversals, amount mismatches and stuck debits. |
+
+## Reconciliation
+
+The retry policy decides whether to try again. Reconciliation decides what actually happened, which is the harder half. It matters most on eNACH, where a return can land T+n, in a file, *after* you have already scheduled a retry. Matching that late success back to the original attempt, and suppressing the now-redundant retry, is where double debits are actually prevented.
+
+`reconcile` takes the debit attempts you made and the outcomes you have received, groups attempts into logical debits by a `debitKey` (your idempotency key), and classifies each one conservatively:
+
+```ts
+import { reconcile } from '@saiprasad4/aadesh';
+
+const report = reconcile({
+  attempts: [
+    { attemptId: 'a1', debitKey: 'mandate42:2026-07', rail: 'enach', amountPaise: 50000, attemptNumber: 1, presentedAt: day0 },
+    { attemptId: 'a2', debitKey: 'mandate42:2026-07', rail: 'enach', amountPaise: 50000, attemptNumber: 2, presentedAt: day1 }, // the retry
+  ],
+  // The original attempt's success arrives late, after the retry was already presented.
+  outcomes: [{ attemptId: 'a1', rail: 'enach', amountPaise: 50000, rawCode: '0', reportedAt: day1 }],
+});
+
+report.debits[0].status;            // 'double_debit_risk'
+report.debits[0].handling.suppressRetry; // true  ... cancel a2 before it also settles
+report.suppressRetryKeys;           // ['mandate42:2026-07']
+```
+
+The status is deliberately dangerous-first. `double_debit_confirmed` (two settlements, a reversal is owed) and `double_debit_risk` (one success while another attempt is still open) come before `settled` and `failed`, and anything that cannot be proven settled... an unrecognized code, an amount that does not match, an outcome past the rail's return window... leans to `needsReview` and `suppressRetry` rather than guessing with money. Amounts are integer paise throughout; floats and negatives are rejected.
 
 ## Rails
 

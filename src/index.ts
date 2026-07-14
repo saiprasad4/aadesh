@@ -52,3 +52,16 @@ export type { LookupOptions } from './codes';
 // ── Retry policy ─────────────────────────────────────────────────────────────
 export { decideRetry } from './retry/policy';
 export type { RetryContext, RetryDecision } from './retry/policy';
+
+// ── Reconciliation ───────────────────────────────────────────────────────────
+export { reconcile, RECONCILIATION_HANDLING, reconciliationHandlingFor } from './reconcile';
+export type {
+  DebitAttempt,
+  DebitOutcome,
+  ReconcileInput,
+  ReconciledAttempt,
+  ReconciledDebit,
+  ReconciliationHandling,
+  ReconciliationReport,
+  ReconciliationStatus,
+} from './reconcile';
