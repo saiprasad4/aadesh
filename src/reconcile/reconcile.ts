@@ -15,13 +15,13 @@ import type {
 
 const HOUR_MS = 60 * 60 * 1000;
 
-function assertMoney(value: number, label: string): void {
+function assertNonNegativeIntegerPaise(value: number, label: string): void {
   if (!Number.isInteger(value) || value < 0) {
     throw new AadeshError(`${label} must be a non-negative integer in paise; got ${value}`);
   }
 }
 
-function assertDate(value: unknown, label: string): void {
+function assertValidDate(value: unknown, label: string): void {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
     throw new AadeshError(`${label} must be a valid Date`);
   }
@@ -31,73 +31,86 @@ function categoryOf(outcome: DebitOutcome): ErrorCategory | undefined {
   return getErrorCode(outcome.rawCode, { rail: outcome.rail })?.category;
 }
 
-/** All outcomes attached to one attempt, plus the derived signals we classify on. */
-interface AttemptState {
+/** One attempt with the outcomes matched to it and the signals we classify on. */
+interface AttemptReconciliation {
   readonly attempt: DebitAttempt;
-  readonly outcomes: DebitOutcome[];
+  readonly matchedOutcomes: DebitOutcome[];
   hasSuccess: boolean;
   hasKnownFailure: boolean;
-  hasUnknown: boolean;
-  amountMismatch: boolean;
+  hasUnknownCode: boolean;
+  hasAmountMismatch: boolean;
 }
 
-function representativeOutcome(state: AttemptState): DebitOutcome | undefined {
-  if (state.outcomes.length === 0) return undefined;
-  // Prefer a success (it is the money-relevant one), else the latest reported.
-  const success = state.outcomes.find((o) => categoryOf(o) === 'success');
-  if (success) return success;
-  return [...state.outcomes].sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime())[0];
+/** The single outcome most worth surfacing for an attempt: a success, else the latest. */
+function pickRepresentativeOutcome(attemptReconciliation: AttemptReconciliation): DebitOutcome | undefined {
+  const { matchedOutcomes } = attemptReconciliation;
+  if (matchedOutcomes.length === 0) return undefined;
+  const successOutcome = matchedOutcomes.find((outcome) => categoryOf(outcome) === 'success');
+  if (successOutcome) return successOutcome;
+  return [...matchedOutcomes].sort(
+    (first, second) => second.reportedAt.getTime() - first.reportedAt.getTime(),
+  )[0];
 }
 
 function classify(
-  states: AttemptState[],
-  leftoverOutcomes: DebitOutcome[],
-  leftoverAmountMismatch: boolean,
+  attemptReconciliations: AttemptReconciliation[],
+  unattributedOutcomes: DebitOutcome[],
+  unattributedAmountMismatch: boolean,
   now: Date,
-  windowHours: number,
-): { status: ReconciliationStatus; unsettled: DebitAttempt[] } {
-  const successAttemptIds = new Set(states.filter((s) => s.hasSuccess).map((s) => s.attempt.attemptId));
-  const leftoverSuccesses = leftoverOutcomes.filter((o) => categoryOf(o) === 'success').length;
-  const totalSuccessSignals = successAttemptIds.size + leftoverSuccesses;
+  returnWindowHours: number,
+): { status: ReconciliationStatus; unsettledAttempts: DebitAttempt[] } {
+  const settledSuccessAttemptIds = new Set(
+    attemptReconciliations.filter((each) => each.hasSuccess).map((each) => each.attempt.attemptId),
+  );
+  const unattributedSuccessCount = unattributedOutcomes.filter(
+    (outcome) => categoryOf(outcome) === 'success',
+  ).length;
+  const totalSuccessSignals = settledSuccessAttemptIds.size + unattributedSuccessCount;
 
-  const unsettled = states.filter((s) => s.outcomes.length === 0).map((s) => s.attempt);
-  const unsettledExists = unsettled.length > 0;
+  const unsettledAttempts = attemptReconciliations
+    .filter((each) => each.matchedOutcomes.length === 0)
+    .map((each) => each.attempt);
+  const hasUnsettledAttempt = unsettledAttempts.length > 0;
 
-  const hasUnknown =
-    states.some((s) => s.hasUnknown) || leftoverOutcomes.some((o) => categoryOf(o) === undefined);
-  const amountMismatch = states.some((s) => s.amountMismatch) || leftoverAmountMismatch;
+  const hasUnknownCode =
+    attemptReconciliations.some((each) => each.hasUnknownCode) ||
+    unattributedOutcomes.some((outcome) => categoryOf(outcome) === undefined);
+  const hasAmountMismatch =
+    attemptReconciliations.some((each) => each.hasAmountMismatch) || unattributedAmountMismatch;
 
-  // An attempt that reports both a success and a failure is internally contradictory.
-  const selfContradiction = states.some((s) => s.hasSuccess && s.hasKnownFailure);
+  // One attempt reporting both a success and a failure is internally contradictory.
+  const hasSelfContradiction = attemptReconciliations.some((each) => each.hasSuccess && each.hasKnownFailure);
 
   let status: ReconciliationStatus;
-  if (successAttemptIds.size >= 2) {
+  if (settledSuccessAttemptIds.size >= 2) {
     status = 'double_debit_confirmed';
   } else if (totalSuccessSignals >= 2) {
-    // One provable success plus another success we cannot attribute to a distinct
-    // attempt: could be a duplicate report or a second settlement. Do not auto-reverse.
+    // One provable success plus another success we cannot pin to a distinct attempt:
+    // could be a duplicate report or a second settlement. Do not auto-reverse.
     status = 'ambiguous';
-  } else if (selfContradiction) {
+  } else if (hasSelfContradiction) {
     status = 'ambiguous';
-  } else if (amountMismatch) {
+  } else if (hasAmountMismatch) {
     status = 'amount_mismatch';
   } else if (totalSuccessSignals === 1) {
-    if (unsettledExists) status = 'double_debit_risk';
-    else if (hasUnknown) status = 'ambiguous';
+    if (hasUnsettledAttempt) status = 'double_debit_risk';
+    else if (hasUnknownCode) status = 'ambiguous';
     else status = 'settled';
   } else {
     // No successes at all.
-    if (hasUnknown) {
+    if (hasUnknownCode) {
       status = 'ambiguous';
-    } else if (unsettledExists) {
-      const overdue = unsettled.some((a) => a.presentedAt.getTime() + windowHours * HOUR_MS <= now.getTime());
-      status = overdue ? 'timed_out' : 'pending';
+    } else if (hasUnsettledAttempt) {
+      const anyAttemptOverdue = unsettledAttempts.some(
+        (attempt) => attempt.presentedAt.getTime() + returnWindowHours * HOUR_MS <= now.getTime(),
+      );
+      status = anyAttemptOverdue ? 'timed_out' : 'pending';
     } else {
       status = 'failed';
     }
   }
 
-  return { status, unsettled };
+  return { status, unsettledAttempts };
 }
 
 function explain(status: ReconciliationStatus, debitKey: string, attemptCount: number): string {
@@ -137,127 +150,147 @@ function explain(status: ReconciliationStatus, debitKey: string, attemptCount: n
  */
 export function reconcile(input: ReconcileInput): ReconciliationReport {
   const now = input.now ?? new Date();
-  assertDate(now, 'now');
+  assertValidDate(now, 'now');
 
-  const attemptById = new Map<string, DebitAttempt>();
-  const attemptsByDebit = new Map<string, DebitAttempt[]>();
+  const attemptsById = new Map<string, DebitAttempt>();
+  const attemptsByDebitKey = new Map<string, DebitAttempt[]>();
 
-  for (const a of input.attempts) {
-    if (!a.attemptId) throw new AadeshError('DebitAttempt.attemptId is required');
-    if (!a.debitKey) throw new AadeshError(`DebitAttempt.debitKey is required (attemptId ${a.attemptId})`);
-    if (!Number.isInteger(a.attemptNumber) || a.attemptNumber < 1) {
-      throw new AadeshError(`attemptNumber must be an integer >= 1 (attemptId ${a.attemptId})`);
+  for (const attempt of input.attempts) {
+    if (!attempt.attemptId) throw new AadeshError('DebitAttempt.attemptId is required');
+    if (!attempt.debitKey) {
+      throw new AadeshError(`DebitAttempt.debitKey is required (attemptId ${attempt.attemptId})`);
     }
-    assertMoney(a.amountPaise, `attempt ${a.attemptId} amountPaise`);
-    assertDate(a.presentedAt, `attempt ${a.attemptId} presentedAt`);
-    if (attemptById.has(a.attemptId)) throw new AadeshError(`Duplicate attemptId: ${a.attemptId}`);
-    attemptById.set(a.attemptId, a);
-    const bucket = attemptsByDebit.get(a.debitKey);
-    if (bucket) bucket.push(a);
-    else attemptsByDebit.set(a.debitKey, [a]);
+    if (!Number.isInteger(attempt.attemptNumber) || attempt.attemptNumber < 1) {
+      throw new AadeshError(`attemptNumber must be an integer >= 1 (attemptId ${attempt.attemptId})`);
+    }
+    assertNonNegativeIntegerPaise(attempt.amountPaise, `attempt ${attempt.attemptId} amountPaise`);
+    assertValidDate(attempt.presentedAt, `attempt ${attempt.attemptId} presentedAt`);
+    if (attemptsById.has(attempt.attemptId)) {
+      throw new AadeshError(`Duplicate attemptId: ${attempt.attemptId}`);
+    }
+    attemptsById.set(attempt.attemptId, attempt);
+    const debitGroup = attemptsByDebitKey.get(attempt.debitKey);
+    if (debitGroup) debitGroup.push(attempt);
+    else attemptsByDebitKey.set(attempt.debitKey, [attempt]);
   }
 
-  // Route outcomes: exact (by attemptId), debit-level (by debitKey), or orphan.
-  const exactByAttempt = new Map<string, DebitOutcome[]>();
-  const debitLevel = new Map<string, DebitOutcome[]>();
+  // Route each outcome: exact (by attemptId), debit-level (by debitKey), or orphan.
+  const outcomesByAttemptId = new Map<string, DebitOutcome[]>();
+  const debitLevelOutcomesByKey = new Map<string, DebitOutcome[]>();
   const orphanOutcomes: DebitOutcome[] = [];
 
-  for (const o of input.outcomes) {
-    if (o.attemptId === undefined && o.debitKey === undefined) {
+  for (const outcome of input.outcomes) {
+    if (outcome.attemptId === undefined && outcome.debitKey === undefined) {
       throw new AadeshError('DebitOutcome needs at least one of attemptId or debitKey');
     }
-    assertMoney(o.amountPaise, 'outcome amountPaise');
-    assertDate(o.reportedAt, 'outcome reportedAt');
-    if (!o.rawCode) throw new AadeshError('DebitOutcome.rawCode is required');
+    assertNonNegativeIntegerPaise(outcome.amountPaise, 'outcome amountPaise');
+    assertValidDate(outcome.reportedAt, 'outcome reportedAt');
+    if (!outcome.rawCode) throw new AadeshError('DebitOutcome.rawCode is required');
 
-    const exact = o.attemptId !== undefined ? attemptById.get(o.attemptId) : undefined;
-    if (exact) {
-      const bucket = exactByAttempt.get(exact.attemptId);
-      if (bucket) bucket.push(o);
-      else exactByAttempt.set(exact.attemptId, [o]);
-    } else if (o.debitKey !== undefined && attemptsByDebit.has(o.debitKey)) {
-      const bucket = debitLevel.get(o.debitKey);
-      if (bucket) bucket.push(o);
-      else debitLevel.set(o.debitKey, [o]);
+    const matchedAttempt = outcome.attemptId !== undefined ? attemptsById.get(outcome.attemptId) : undefined;
+    if (matchedAttempt) {
+      const existing = outcomesByAttemptId.get(matchedAttempt.attemptId);
+      if (existing) existing.push(outcome);
+      else outcomesByAttemptId.set(matchedAttempt.attemptId, [outcome]);
+    } else if (outcome.debitKey !== undefined && attemptsByDebitKey.has(outcome.debitKey)) {
+      const existing = debitLevelOutcomesByKey.get(outcome.debitKey);
+      if (existing) existing.push(outcome);
+      else debitLevelOutcomesByKey.set(outcome.debitKey, [outcome]);
     } else {
-      orphanOutcomes.push(o);
+      orphanOutcomes.push(outcome);
     }
   }
 
-  const debits: ReconciledDebit[] = [];
+  const reconciledDebits: ReconciledDebit[] = [];
 
-  for (const [debitKey, rawAttempts] of attemptsByDebit) {
-    const attempts = [...rawAttempts].sort(
-      (a, b) => a.attemptNumber - b.attemptNumber || a.presentedAt.getTime() - b.presentedAt.getTime(),
+  for (const [debitKey, debitAttempts] of attemptsByDebitKey) {
+    const orderedAttempts = [...debitAttempts].sort(
+      (left, right) =>
+        left.attemptNumber - right.attemptNumber || left.presentedAt.getTime() - right.presentedAt.getTime(),
     );
-    const rail = attempts[0]!.rail;
-    const debitAmount = attempts[0]!.amountPaise;
-    const windowHours = input.returnWindowHours ?? getRailProfile(rail).returnWindowHours;
+    const rail = orderedAttempts[0]!.rail;
+    const debitAmountPaise = orderedAttempts[0]!.amountPaise;
+    const returnWindowHours = input.returnWindowHours ?? getRailProfile(rail).returnWindowHours;
 
-    // Seed each attempt with its exact outcomes.
-    const states: AttemptState[] = attempts.map((attempt) => ({
+    // Seed each attempt with the outcomes that reference it by attemptId.
+    const attemptReconciliations: AttemptReconciliation[] = orderedAttempts.map((attempt) => ({
       attempt,
-      outcomes: [...(exactByAttempt.get(attempt.attemptId) ?? [])],
+      matchedOutcomes: [...(outcomesByAttemptId.get(attempt.attemptId) ?? [])],
       hasSuccess: false,
       hasKnownFailure: false,
-      hasUnknown: false,
-      amountMismatch: false,
+      hasUnknownCode: false,
+      hasAmountMismatch: false,
     }));
 
-    // Attribute debit-level (anonymous) outcomes to still-unsettled attempts, oldest first.
-    const anon = [...(debitLevel.get(debitKey) ?? [])].sort(
-      (a, b) => a.reportedAt.getTime() - b.reportedAt.getTime(),
+    // Attribute debit-level outcomes (no attemptId) to still-unsettled attempts, oldest first.
+    const debitLevelOutcomes = [...(debitLevelOutcomesByKey.get(debitKey) ?? [])].sort(
+      (earlier, later) => earlier.reportedAt.getTime() - later.reportedAt.getTime(),
     );
-    const leftover: DebitOutcome[] = [];
-    for (const o of anon) {
-      const target = states.find((s) => s.outcomes.length === 0);
-      if (target) target.outcomes.push(o);
-      else leftover.push(o);
+    const unattributedOutcomes: DebitOutcome[] = [];
+    for (const outcome of debitLevelOutcomes) {
+      const openAttempt = attemptReconciliations.find((each) => each.matchedOutcomes.length === 0);
+      if (openAttempt) openAttempt.matchedOutcomes.push(outcome);
+      else unattributedOutcomes.push(outcome);
     }
 
-    // Derive per-attempt signals.
-    for (const s of states) {
-      for (const o of s.outcomes) {
-        const cat = categoryOf(o);
-        if (cat === 'success') s.hasSuccess = true;
-        else if (cat === undefined) s.hasUnknown = true;
-        else s.hasKnownFailure = true;
-        if (o.amountPaise !== s.attempt.amountPaise) s.amountMismatch = true;
+    // Derive per-attempt signals from its matched outcomes.
+    for (const attemptReconciliation of attemptReconciliations) {
+      for (const outcome of attemptReconciliation.matchedOutcomes) {
+        const category = categoryOf(outcome);
+        if (category === 'success') attemptReconciliation.hasSuccess = true;
+        else if (category === undefined) attemptReconciliation.hasUnknownCode = true;
+        else attemptReconciliation.hasKnownFailure = true;
+        if (outcome.amountPaise !== attemptReconciliation.attempt.amountPaise) {
+          attemptReconciliation.hasAmountMismatch = true;
+        }
       }
     }
-    // Leftover anonymous outcomes are extra settlements against this debit; a
-    // mismatched amount on one is still a mismatch for the debit.
-    const leftoverMismatch = leftover.some((o) => o.amountPaise !== debitAmount);
+    // A leftover outcome whose amount disagrees is a mismatch for the whole debit.
+    const unattributedAmountMismatch = unattributedOutcomes.some(
+      (outcome) => outcome.amountPaise !== debitAmountPaise,
+    );
 
-    const { status, unsettled } = classify(states, leftover, leftoverMismatch, now, windowHours);
+    const { status, unsettledAttempts } = classify(
+      attemptReconciliations,
+      unattributedOutcomes,
+      unattributedAmountMismatch,
+      now,
+      returnWindowHours,
+    );
 
-    const reconciledAttempts: ReconciledAttempt[] = states.map((s) => {
-      const outcome = representativeOutcome(s);
+    const reconciledAttempts: ReconciledAttempt[] = attemptReconciliations.map((attemptReconciliation) => {
+      const representativeOutcome = pickRepresentativeOutcome(attemptReconciliation);
       return {
-        attempt: s.attempt,
-        outcome,
-        category: outcome ? categoryOf(outcome) : undefined,
+        attempt: attemptReconciliation.attempt,
+        outcome: representativeOutcome,
+        category: representativeOutcome ? categoryOf(representativeOutcome) : undefined,
       };
     });
 
-    debits.push({
+    reconciledDebits.push({
       debitKey,
       rail,
       status,
       handling: RECONCILIATION_HANDLING[status],
       attempts: reconciledAttempts,
-      unsettledAttemptIds: unsettled.map((a) => a.attemptId),
-      explanation: explain(status, debitKey, attempts.length),
+      unsettledAttemptIds: unsettledAttempts.map((attempt) => attempt.attemptId),
+      explanation: explain(status, debitKey, orderedAttempts.length),
     });
   }
 
-  debits.sort((a, b) => (a.debitKey < b.debitKey ? -1 : a.debitKey > b.debitKey ? 1 : 0));
+  reconciledDebits.sort((left, right) =>
+    left.debitKey < right.debitKey ? -1 : left.debitKey > right.debitKey ? 1 : 0,
+  );
 
   return {
-    debits,
+    debits: reconciledDebits,
     orphanOutcomes,
-    suppressRetryKeys: debits.filter((d) => d.handling.suppressRetry).map((d) => d.debitKey),
-    reversalKeys: debits.filter((d) => d.handling.reversalRequired).map((d) => d.debitKey),
-    reviewKeys: debits.filter((d) => d.handling.needsReview).map((d) => d.debitKey),
+    suppressRetryKeys: reconciledDebits
+      .filter((debit) => debit.handling.suppressRetry)
+      .map((debit) => debit.debitKey),
+    reversalKeys: reconciledDebits
+      .filter((debit) => debit.handling.reversalRequired)
+      .map((debit) => debit.debitKey),
+    reviewKeys: reconciledDebits.filter((debit) => debit.handling.needsReview).map((debit) => debit.debitKey),
   };
 }
