@@ -88,3 +88,12 @@ export type {
   DebitFrequency,
   UpcomingDebit,
 } from './compliance';
+
+// ── PSP webhook adapters (Razorpay, Cashfree) ──────────────────────────────────
+export { normalizeRazorpayWebhook, normalizeCashfreeWebhook } from './webhooks';
+export type {
+  WebhookProvider,
+  NormalizedEventKind,
+  EventScope,
+  MandateWebhookEvent,
+} from './webhooks';

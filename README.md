@@ -148,6 +148,27 @@ upcomingDebits(
 // [{ debitAt: 2026-01-15, notifySendBy: 2026-01-14 }, { debitAt: 2026-02-15, notifySendBy: 2026-02-14 }, ...]
 ```
 
+## PSP webhooks
+
+Every PSP names its recurring events differently and sends amounts in a different unit, so integrators hand-write a fragile switch statement per provider. `normalizeRazorpayWebhook` and `normalizeCashfreeWebhook` collapse a raw webhook into one event aligned with the state machines, so the same handler works across providers.
+
+Razorpay sends amounts in paise, Cashfree in rupees. Both come out as integer paise, so a ₹1,000 charge is `100000` either way.
+
+```ts
+import { normalizeRazorpayWebhook } from '@saiprasad4/aadesh';
+
+const event = normalizeRazorpayWebhook(req.body);
+
+event.kind;         // 'debit.succeeded' | 'debit.failed' | 'mandate.activated' | ...
+event.scope;        // 'debit' | 'mandate' | 'refund' | 'unknown'
+event.debitState;   // 'succeeded' ... the state to move the debit to
+event.mandateRef;   // the subscription id
+event.amountPaise;  // integer paise, whatever unit the provider used
+event.errorCode;    // resolved through the code dataset when the raw code is known
+```
+
+A failed charge maps to `debit.failed` and an exhausted one to `debit.exhausted`, so the webhook feeds straight into the retry and reconciliation logic. An event aadesh does not model returns `kind: 'unknown'` rather than throwing, and the original payload is on `raw`. Mappings are verified against the Razorpay Subscriptions and Cashfree Subscriptions v1 webhook docs.
+
 ## Rails
 
 `aadesh` models two rails behind one vocabulary:

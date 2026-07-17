@@ -13,6 +13,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.4.0] - 2026-07-17
+
+### Added
+- PSP webhook adapters that normalize a provider webhook into one aadesh lifecycle event, aligned with the mandate and debit state machines:
+  - `normalizeRazorpayWebhook`: the 10 Razorpay `subscription.*` events, amounts kept in paise, rail read from the payment method, a failed charge mapped to `debit.failed` and an exhausted one to `debit.exhausted`.
+  - `normalizeCashfreeWebhook`: the Cashfree Subscriptions (v1) events, amounts converted from rupees to integer paise, keyed on the actual `cf_event` string (which does not always match the event name), status changes and auth results mapped to mandate states.
+  - Both return a `MandateWebhookEvent` carrying the normalized `kind`, target `mandateState`/`debitState`, `mandateRef`, `debitRef`, integer-paise `amountPaise`, and the raw failure code resolved through the code dataset when it is known. Unmodelled events return `kind: 'unknown'` rather than throwing, and the original payload is kept on `raw`.
+- Verified against the Razorpay Subscriptions and Cashfree Subscriptions v1 webhook docs. The Razorpay-paise vs Cashfree-rupees difference is normalized so a ₹1,000 charge is 100000 paise from either provider.
+
 ## [0.3.0] - 2026-07-17
 
 ### Added
