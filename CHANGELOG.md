@@ -13,6 +13,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.3.0] - 2026-07-17
+
+### Added
+- Compliance layer that operationalizes the RBI Digital Payments E-mandate Framework, 2026 (RBI/DPSS/2026-27/396), driven off the existing rail profiles:
+  - `checkDebitLimits`: whether a debit needs Additional Factor of Authentication (no-AFA up to ₹15,000, or ₹1,00,000 for eligible merchant categories by MCC) and whether it is within the mandate maximum. Amounts are integer paise; the ceiling is inclusive.
+  - `planPreDebitNotification` / `isPreDebitNotificationTimely`: the 24-hour pre-debit notification deadline and a timeliness check, with FASTag and NCMC auto-recharges exempt, plus the required notification fields.
+  - `debitSchedule` / `upcomingDebits`: compute the debit dates in a window from the mandate frequency and anchor day (month-end clamped, UTC), each paired with its notification deadline. `as_presented` mandates return nothing, since they cannot be precomputed.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added

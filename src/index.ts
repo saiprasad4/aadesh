@@ -65,3 +65,26 @@ export type {
   ReconciliationReport,
   ReconciliationStatus,
 } from './reconcile';
+
+// ── Compliance (AFA limits, pre-debit notification, schedule) ──────────────────
+export {
+  checkDebitLimits,
+  planPreDebitNotification,
+  isPreDebitNotificationTimely,
+  PRE_DEBIT_NOTIFICATION_FIELDS,
+  debitSchedule,
+  upcomingDebits,
+} from './compliance';
+export type {
+  DebitLimitInput,
+  DebitLimitCheck,
+  DebitLimitFlag,
+  PreDebitNotificationInput,
+  PreDebitNotificationPlan,
+  PreDebitNotificationTimelinessInput,
+  NotificationExemptCategory,
+  MandateTerms,
+  DateWindow,
+  DebitFrequency,
+  UpcomingDebit,
+} from './compliance';

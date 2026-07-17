@@ -112,6 +112,42 @@ report.suppressRetryKeys;           // ['mandate42:2026-07']
 
 The status is deliberately dangerous-first. `double_debit_confirmed` (two settlements, a reversal is owed) and `double_debit_risk` (one success while another attempt is still open) come before `settled` and `failed`, and anything that cannot be proven settled... an unrecognized code, an amount that does not match, an outcome past the rail's return window... leans to `needsReview` and `suppressRetry` rather than guessing with money. Amounts are integer paise throughout; floats and negatives are rejected.
 
+## Compliance
+
+The state machine tells you what state a mandate is in. The compliance layer tells you what the RBI rules let you do with it, driven off the same rail profiles so the thresholds live in one place. It encodes the RBI Digital Payments E-mandate Framework, 2026.
+
+`checkDebitLimits` answers whether a debit needs an Additional Factor of Authentication and whether it is within the mandate cap. No AFA is needed up to ₹15,000, or up to ₹1,00,000 for the eligible merchant categories (mutual funds, insurance, card bills), which you signal by MCC. The ceiling is inclusive, and amounts are integer paise.
+
+```ts
+import { checkDebitLimits } from '@saiprasad4/aadesh';
+
+checkDebitLimits({ rail: 'upi_autopay', amountPaise: 2_000_000 }).afaRequired;          // true  (₹20,000, over the ₹15,000 line)
+checkDebitLimits({ rail: 'upi_autopay', amountPaise: 5_000_000, mcc: '6300' }).afaRequired; // false (₹50,000 insurance, under ₹1,00,000)
+```
+
+`planPreDebitNotification` works back from a debit to the 24-hour notification deadline, and `isPreDebitNotificationTimely` checks a notice you actually sent against it. FASTag and NCMC auto-recharges are exempt.
+
+```ts
+import { planPreDebitNotification } from '@saiprasad4/aadesh';
+
+const plan = planPreDebitNotification({ rail: 'upi_autopay', debitAt: new Date('2026-03-15T10:00:00Z') });
+plan.sendBy;         // 2026-03-14T10:00:00Z ... notify by here or you are non-compliant
+plan.requiredFields; // ['amount', 'debitDate', 'merchantName', 'mandateReference', 'reason']
+```
+
+`debitSchedule` computes the debit dates in a window from the frequency and anchor day, clamping a day-31 anchor to the last day of shorter months. `upcomingDebits` pairs each debit with its notification deadline, which is the whole flow in one call. `as_presented` mandates return nothing, since a variable, merchant-initiated debit cannot be precomputed.
+
+```ts
+import { upcomingDebits } from '@saiprasad4/aadesh';
+
+upcomingDebits(
+  { frequency: 'monthly', startDate: new Date('2026-01-15T00:00:00Z') },
+  { from: new Date('2026-01-01T00:00:00Z'), to: new Date('2026-03-31T00:00:00Z') },
+  'upi_autopay',
+);
+// [{ debitAt: 2026-01-15, notifySendBy: 2026-01-14 }, { debitAt: 2026-02-15, notifySendBy: 2026-02-14 }, ...]
+```
+
 ## Rails
 
 `aadesh` models two rails behind one vocabulary:
